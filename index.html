@@ -4,333 +4,351 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>快樂學時鐘</title>
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-    <div id="root"></div>
-    <script type="text/babel">
-const { useState, useCallback } = React;
+<body class="bg-yellow-50 min-h-screen">
+    <div id="app"></div>
 
-// Icons
-const Play = ({size=24,fill="none"}) => (<svg width={size} height={size} viewBox="0 0 24 24" fill={fill} stroke="currentColor" strokeWidth="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>);
-const RotateCcw = ({size=24}) => (<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>);
-const Check = ({size=24,strokeWidth=2}) => (<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth}><polyline points="20 6 9 17 4 12"/></svg>);
-const X = ({size=24,strokeWidth=2}) => (<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>);
-const ClockIcon = ({size=24,strokeWidth=2,className=""}) => (<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} className={className}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>);
-const ChevronRight = ({size=24,className=""}) => (<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}><polyline points="9 18 15 12 9 6"/></svg>);
-const Star = ({size=24,className=""}) => (<svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" className={className}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>);
-const Home = ({size=24}) => (<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>);
-const LogOut = ({size=24}) => (<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>);
+    <script>
+        const COMPLIMENTS = ["太神啦！你答對了！🥳🎉", "💯 完美！真是個時間大師！", "🌟 哇！完全正確！超級厲害！", "給你一個讚！👍 繼續加油！", "太棒了！👏 你知道答案！"];
+        
+        let state = {
+            screen: 'menu',
+            questions: [],
+            currentIdx: 0,
+            userAnswers: [],
+            input: {h: '', m: ''},
+            focus: 'H',
+            count: 20,
+            interval: 'random',
+            processing: false,
+            reviewing: false,
+            selectedReview: null
+        };
 
-const QUESTION_COUNTS = [20, 30];
-const INTERVAL_OPTIONS = [
-  { key: 'hourly', label: '整點 (如 3:00)' },
-  { key: 'half', label: '半點 (如 3:30)' },
-  { key: 'five_min', label: '五分鐘 (如 3:05)' },
-  { key: 'random', label: '隨機分鐘' },
-];
-const COMPLIMENTS = ["太神啦！你答對了！🥳🎉", "💯 完美！真是個時間大師！", "🌟 哇！完全正確！超級厲害！", "給你一個讚！👍 繼續加油！", "太棒了！👏 你知道答案！"];
+        function generateTime(interval) {
+            const h = Math.floor(Math.random() * 12) + 1;
+            let m;
+            switch(interval) {
+                case 'hourly': m = 0; break;
+                case 'half': m = 30; break;
+                case 'five_min': m = Math.floor(Math.random() * 12) * 5; break;
+                default: m = Math.floor(Math.random() * 60);
+            }
+            return {h, m};
+        }
 
-const ClockFace = ({ hours, minutes, size = 250 }) => {
-  const minuteAngle = minutes * 6;
-  const hourAngle = ((hours % 12) + minutes / 60) * 30;
-  return (
-    <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
-      <svg width={size} height={size} viewBox="0 0 100 100">
-        <circle cx="50" cy="50" r="48" fill="#FFF" stroke="#F472B6" strokeWidth="4" />
-        <circle cx="50" cy="50" r="45" fill="#FFF1F2" />
-        {[...Array(60)].map((_, i) => {
-          const rotation = i * 6;
-          const isHour = i % 5 === 0;
-          return (<line key={i} x1="50" y1="6" x2="50" y2={6 + (isHour ? 6 : 3)} transform={`rotate(${rotation} 50 50)`} stroke={isHour ? '#F472B6' : '#F9A8D4'} strokeWidth={isHour ? 2 : 1} strokeLinecap="round" />);
-        })}
-        {[...Array(12)].map((_, i) => {
-          const num = i + 1;
-          const angle = (num * 30 * Math.PI) / 180;
-          const x = 50 + 35 * Math.sin(angle);
-          const y = 50 - 35 * Math.cos(angle);
-          return (<text key={num} x={x} y={y + 1} dominantBaseline="middle" textAnchor="middle" className="font-bold fill-indigo-600" style={{ fontSize: '10px' }}>{num}</text>);
-        })}
-        <line x1="50" y1="50" x2="50" y2="28" stroke="#8B5CF6" strokeWidth="4" strokeLinecap="round" transform={`rotate(${hourAngle} 50 50)`} />
-        <line x1="50" y1="50" x2="50" y2="18" stroke="#06B6D4" strokeWidth="3" strokeLinecap="round" transform={`rotate(${minuteAngle} 50 50)`} />
-        <circle cx="50" cy="50" r="3" fill="#F472B6" />
-      </svg>
-    </div>
-  );
-};
+        function drawClock(h, m, size = 260) {
+            const minAngle = m * 6;
+            const hrAngle = ((h % 12) + m / 60) * 30;
+            let svg = `<svg width="${size}" height="${size}" viewBox="0 0 100 100" class="drop-shadow-xl">
+                <circle cx="50" cy="50" r="48" fill="#FFF" stroke="#F472B6" stroke-width="4"/>
+                <circle cx="50" cy="50" r="45" fill="#FFF1F2"/>`;
+            
+            for(let i = 0; i < 60; i++) {
+                const rot = i * 6;
+                const isHr = i % 5 === 0;
+                svg += `<line x1="50" y1="6" x2="50" y2="${6 + (isHr ? 6 : 3)}" transform="rotate(${rot} 50 50)" stroke="${isHr ? '#F472B6' : '#F9A8D4'}" stroke-width="${isHr ? 2 : 1}" stroke-linecap="round"/>`;
+            }
+            
+            for(let i = 1; i <= 12; i++) {
+                const ang = (i * 30 * Math.PI) / 180;
+                const x = 50 + 35 * Math.sin(ang);
+                const y = 50 - 35 * Math.cos(ang) + 1;
+                svg += `<text x="${x}" y="${y}" dominant-baseline="middle" text-anchor="middle" class="font-bold fill-indigo-600" style="font-size:10px">${i}</text>`;
+            }
+            
+            svg += `<line x1="50" y1="50" x2="50" y2="28" stroke="#8B5CF6" stroke-width="4" stroke-linecap="round" transform="rotate(${hrAngle} 50 50)"/>
+                <line x1="50" y1="50" x2="50" y2="18" stroke="#06B6D4" stroke-width="3" stroke-linecap="round" transform="rotate(${minAngle} 50 50)"/>
+                <circle cx="50" cy="50" r="3" fill="#F472B6"/></svg>`;
+            return svg;
+        }
 
-const NumPad = ({ onInput, onDelete, onConfirm, valueH, valueM, focus, setFocus }) => (
-  <div className="flex flex-col gap-4 w-full max-w-xs mx-auto">
-    <div className="flex justify-center items-center gap-3 mb-2">
-      <div onClick={() => setFocus('H')} className={`relative p-4 rounded-2xl border-4 text-3xl font-black w-24 text-center cursor-pointer ${focus === 'H' ? 'border-pink-400 bg-pink-50 text-pink-600' : 'border-gray-100 bg-white text-gray-400'}`}>
-        {valueH || '?'}
-        {focus === 'H' && <div className="absolute -top-2 -right-2"><Star size={20} className="fill-yellow-400 text-yellow-400"/></div>}
-      </div>
-      <span className="text-3xl font-black text-indigo-300">:</span>
-      <div onClick={() => setFocus('M')} className={`relative p-4 rounded-2xl border-4 text-3xl font-black w-24 text-center cursor-pointer ${focus === 'M' ? 'border-cyan-400 bg-cyan-50 text-cyan-600' : 'border-gray-100 bg-white text-gray-400'}`}>
-        {valueM || '?'}
-        {focus === 'M' && <div className="absolute -top-2 -right-2"><Star size={20} className="fill-yellow-400 text-yellow-400"/></div>}
-      </div>
-    </div>
-    <div className="grid grid-cols-3 gap-3">
-      {[1,2,3,4,5,6,7,8,9].map(num => (<button key={num} onClick={() => onInput(num)} className="p-4 bg-white rounded-2xl shadow-sm border-2 border-indigo-50 text-2xl font-black text-indigo-500 hover:bg-indigo-50">{num}</button>))}
-      <button onClick={onDelete} className="p-4 bg-red-50 rounded-2xl shadow-sm border-2 border-red-100 text-xl font-bold text-red-400 hover:bg-red-100 flex items-center justify-center">⌫</button>
-      <button onClick={() => onInput(0)} className="p-4 bg-white rounded-2xl shadow-sm border-2 border-indigo-50 text-2xl font-black text-indigo-500 hover:bg-indigo-50">0</button>
-      <button onClick={onConfirm} className="p-4 bg-gradient-to-r from-pink-400 to-rose-400 rounded-2xl shadow-sm text-white text-xl font-black hover:from-pink-500 hover:to-rose-500 flex items-center justify-center gap-2">OK <Check size={24} strokeWidth={3} /></button>
-    </div>
-  </div>
-);
+        function formatTime(h, m) {
+            return `${h}:${m.toString().padStart(2, '0')}`;
+        }
 
-const HomeButton = ({ onClick }) => (<button onClick={onClick} className="fixed top-4 left-4 p-3 bg-white text-indigo-500 rounded-full shadow-lg hover:bg-indigo-50 z-50 border-2 border-indigo-50"><Home size={24} /></button>);
+        function isCorrect(q, a) {
+            return q && a && q.h === a.h && q.m === a.m;
+        }
 
-function ClockLearningApp() {
-  const [gameState, setGameState] = useState('menu');
-  const [questions, setQuestions] = useState([]);
-  const [currentQIndex, setCurrentQIndex] = useState(0);
-  const [userAnswers, setUserAnswers] = useState([]);
-  const [currentInput, setCurrentInput] = useState({ h: '', m: '' });
-  const [inputFocus, setInputFocus] = useState('H');
-  const [selectedReviewQ, setSelectedReviewQ] = useState(null);
-  const [questionCount, setQuestionCount] = useState(20);
-  const [timeInterval, setTimeInterval] = useState('random');
-  const [feedbackMessage, setFeedbackMessage] = useState(null);
-  const [isReviewingImmediate, setIsReviewingImmediate] = useState(false);
+        function showMessage(text, type) {
+            const msg = document.createElement('div');
+            msg.className = `fixed top-4 left-1/2 -translate-x-1/2 p-4 rounded-full shadow-2xl z-50 font-bold text-xl ${type === 'success' ? 'bg-green-500' : 'bg-red-500'} text-white`;
+            msg.textContent = text;
+            document.body.appendChild(msg);
+            setTimeout(() => msg.remove(), type === 'success' ? 1500 : 2000);
+        }
 
-  const formatTime = (h, m) => `${h}:${m.toString().padStart(2, '0')}`;
-  const isCorrect = (q, a) => q && a && q.h === a.h && q.m === a.m;
+        function startGame() {
+            state.questions = Array.from({length: state.count}, () => generateTime(state.interval));
+            state.screen = 'playing';
+            state.currentIdx = 0;
+            state.userAnswers = [];
+            state.input = {h: '', m: ''};
+            state.focus = 'H';
+            state.processing = false;
+            state.reviewing = false;
+            render();
+        }
 
-  const generateTimeByInterval = useCallback((interval) => {
-    const h = Math.floor(Math.random() * 12) + 1;
-    let m;
-    switch (interval) {
-      case 'hourly': m = 0; break;
-      case 'half': m = 30; break;
-      case 'five_min': m = Math.floor(Math.random() * 12) * 5; break;
-      default: m = Math.floor(Math.random() * 60);
-    }
-    return { h, m };
-  }, []);
+        function handleInput(num) {
+            if(state.processing || state.reviewing) return;
+            const field = state.focus === 'H' ? 'h' : 'm';
+            let val = state.input[field] + num;
+            const intVal = parseInt(val);
+            
+            if(field === 'h') {
+                if(intVal > 12 || (intVal === 0 && val.length === 2)) val = state.input[field];
+                else if(val.length === 2 && intVal <= 12) setTimeout(() => {state.focus = 'M'; render();}, 150);
+            } else {
+                if(intVal > 59) val = state.input[field];
+            }
+            
+            if(val.length <= 2) state.input[field] = val;
+            render();
+        }
 
-  const resetAndReturnToMenu = () => {
-    setQuestions([]);
-    setUserAnswers([]);
-    setCurrentInput({ h: '', m: '' });
-    setFeedbackMessage(null);
-    setIsReviewingImmediate(false);
-    setTimeout(() => setGameState('menu'), 0);
-  };
+        function handleDelete() {
+            if(state.processing || state.reviewing) return;
+            const field = state.focus === 'H' ? 'h' : 'm';
+            state.input[field] = state.input[field].slice(0, -1);
+            render();
+        }
 
-  const startGame = () => {
-    setFeedbackMessage(null);
-    const newQuestions = [];
-    let lastTime = null;
-    
-    for (let i = 0; i < questionCount; i++) {
-      let newTime;
-      do {
-        newTime = generateTimeByInterval(timeInterval);
-      } while (lastTime && newTime.h === lastTime.h && newTime.m === lastTime.m);
-      
-      newQuestions.push(newTime);
-      lastTime = newTime;
-    }
-    
-    setQuestions(newQuestions);
-    setGameState('playing');
-    setCurrentQIndex(0);
-    setUserAnswers([]);
-    setCurrentInput({ h: '', m: '' });
-    setInputFocus('H');
-    setSelectedReviewQ(null);
-  };
+        function handleConfirm() {
+            if(state.processing || state.reviewing) return;
+            
+            if(!state.input.h) {showMessage("請先輸入小時喔！", 'error'); return;}
+            if(!state.input.m) {showMessage("請輸入分鐘喔！", 'error'); return;}
+            
+            const h = parseInt(state.input.h);
+            const m = parseInt(state.input.m);
+            
+            if(h < 1 || h > 12 || m < 0 || m > 59) {
+                showMessage("輸入時間超出範圍（小時1-12，分鐘0-59）。", 'error');
+                return;
+            }
+            
+            state.processing = true;
+            const ans = {h, m};
+            state.userAnswers.push(ans);
+            const correct = isCorrect(state.questions[state.currentIdx], ans);
+            
+            if(correct) {
+                showMessage(COMPLIMENTS[Math.floor(Math.random() * COMPLIMENTS.length)], 'success');
+                setTimeout(goNext, 1500);
+            } else {
+                showMessage("答錯了！沒關係，讓我們看看正確答案。", 'error');
+                state.reviewing = true;
+                render();
+            }
+        }
 
-  const goToNextQuestion = () => {
-    setIsReviewingImmediate(false);
-    setCurrentInput({ h: '', m: '' });
-    setInputFocus('H');
-    setFeedbackMessage(null);
-    if (currentQIndex < questions.length - 1) {
-      setCurrentQIndex(currentQIndex + 1);
-    } else {
-      setGameState('results');
-    }
-  };
+        function goNext() {
+            state.reviewing = false;
+            state.input = {h: '', m: ''};
+            state.focus = 'H';
+            state.processing = false;
+            
+            if(state.currentIdx < state.questions.length - 1) {
+                state.currentIdx++;
+                render();
+            } else {
+                state.screen = 'results';
+                render();
+            }
+        }
 
-  const handleInput = (num) => {
-    setCurrentInput(prev => {
-      let val = prev[inputFocus === 'H' ? 'h' : 'm'];
-      if (val.length >= 2) return prev;
-      let newVal = val + num;
-      const intVal = parseInt(newVal);
-      if (inputFocus === 'H') {
-        if (intVal > 12) newVal = val;
-        if (intVal === 0 && newVal.length === 2) newVal = val;
-        if (newVal.length === 2 && intVal <= 12) setTimeout(() => setInputFocus('M'), 150);
-      } else {
-        if (intVal > 59) newVal = val;
-      }
-      return { ...prev, [inputFocus === 'H' ? 'h' : 'm']: newVal };
-    });
-  };
+        function returnToMenu() {
+            state = {screen: 'menu', questions: [], currentIdx: 0, userAnswers: [], input: {h: '', m: ''}, focus: 'H', count: 20, interval: 'random', processing: false, reviewing: false, selectedReview: null};
+            render();
+        }
 
-  const handleDelete = () => {
-    setCurrentInput(prev => {
-      const field = inputFocus === 'H' ? 'h' : 'm';
-      return { ...prev, [field]: prev[field].slice(0, -1) };
-    });
-  };
-
-  const handleConfirm = () => {
-    if (isReviewingImmediate) return goToNextQuestion();
-    const q = questions[currentQIndex];
-    if (!currentInput.h) { setFeedbackMessage({ text: "請先輸入小時喔！", type: 'error' }); return; }
-    if (!currentInput.m) { setFeedbackMessage({ text: "請輸入分鐘喔！", type: 'error' }); return; }
-    const h = parseInt(currentInput.h);
-    const m = parseInt(currentInput.m);
-    if (h < 1 || h > 12 || m < 0 || m > 59) { setFeedbackMessage({ text: "輸入時間超出範圍。", type: 'error' }); return; }
-    const newAnswer = { h, m };
-    const correct = isCorrect(q, newAnswer);
-    setUserAnswers([...userAnswers, newAnswer]);
-    if (correct) {
-      const msg = COMPLIMENTS[Math.floor(Math.random() * COMPLIMENTS.length)];
-      setFeedbackMessage({ text: msg, type: 'success' });
-      setTimeout(() => { setFeedbackMessage(null); goToNextQuestion(); }, 1500);
-    } else {
-      setFeedbackMessage({ text: "答錯了！沒關係，讓我們看看正確答案。", type: 'error' });
-      setIsReviewingImmediate(true);
-    }
-  };
-
-  if (gameState === 'menu') {
-    return (
-      <div className="min-h-screen bg-yellow-50 flex items-center justify-center p-4 font-sans relative">
-        <HomeButton onClick={resetAndReturnToMenu} />
-        <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center border-8 border-white">
-          <div className="mb-6 flex justify-center text-pink-500"><ClockIcon size={80} strokeWidth={2} /></div>
-          <h1 className="text-4xl font-black text-indigo-500 mb-6">快樂學時鐘</h1>
-          <div className="space-y-6 text-left">
-            <div>
-              <h3 className="text-xl font-bold text-gray-700 mb-3 flex items-center gap-2"><ChevronRight className="text-pink-500"/> 選擇題目數量</h3>
-              <div className="flex gap-4 justify-center">
-                {QUESTION_COUNTS.map(count => (
-                  <button key={count} onClick={() => setQuestionCount(count)} className={`py-3 px-6 rounded-xl text-lg font-black shadow-md ${questionCount === count ? 'bg-pink-500 text-white' : 'bg-white text-pink-500 border-2 border-pink-200'}`}>{count} 題</button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <h3 className="text-xl font-bold text-gray-700 mb-3 flex items-center gap-2"><ChevronRight className="text-teal-500"/> 選擇測驗類型</h3>
-              <div className="grid grid-cols-2 gap-3">
-                {INTERVAL_OPTIONS.map(option => (
-                  <button key={option.key} onClick={() => setTimeInterval(option.key)} className={`py-2 px-4 rounded-xl text-sm font-medium text-center ${timeInterval === option.key ? 'bg-teal-500 text-white' : 'bg-white text-teal-600 border-2 border-teal-200'}`}>{option.label}</button>
-                ))}
-              </div>
-            </div>
-          </div>
-          <button onClick={startGame} className="w-full mt-8 py-5 bg-gradient-to-r from-yellow-400 to-orange-400 text-white rounded-2xl text-2xl font-black flex items-center justify-center gap-3">
-            <Play size={28} fill="currentColor" />開始挑戰 ({questionCount} 題)
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (gameState === 'playing') {
-    const currentQ = questions[currentQIndex];
-    if (!currentQ) return null;
-    const latestAnswer = userAnswers[userAnswers.length - 1];
-    return (
-      <div className="min-h-screen bg-blue-50 flex flex-col items-center p-4 font-sans relative">
-        <HomeButton onClick={resetAndReturnToMenu} />
-        <div className="w-full max-w-md flex flex-col items-center gap-6 pt-16">
-          <div className="w-full flex justify-between items-center px-2">
-            <span className="text-indigo-400 font-black bg-white px-4 py-2 rounded-full shadow-lg border-2 border-indigo-50">第 {currentQIndex + 1} / {questions.length} 題</span>
-            <div className="flex gap-1">{questions.map((_, idx) => (<div key={idx} className={`w-3 h-3 rounded-full ${idx === currentQIndex ? 'bg-pink-400' : idx < currentQIndex ? 'bg-teal-400' : 'bg-gray-200'}`} />))}</div>
-          </div>
-          {feedbackMessage && (<div className={`fixed top-4 left-1/2 -translate-x-1/2 p-4 rounded-full shadow-2xl z-30 font-bold text-xl ${feedbackMessage.type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>{feedbackMessage.text}</div>)}
-          <div className="bg-white p-6 rounded-3xl shadow-xl border-4 border-indigo-50"><ClockFace hours={currentQ.h} minutes={currentQ.m} size={260} /></div>
-          <div className="text-center">
-            <h2 className="text-2xl font-black text-indigo-600 mb-1">現在幾點呢？</h2>
-            <p className="text-gray-400 font-medium">觀察時鐘，輸入正確的數字</p>
-          </div>
-          {!isReviewingImmediate && (<NumPad onInput={handleInput} onDelete={handleDelete} onConfirm={handleConfirm} valueH={currentInput.h} valueM={currentInput.m} focus={inputFocus} setFocus={setInputFocus} />)}
-          <button onClick={resetAndReturnToMenu} disabled={isReviewingImmediate} className={`w-full max-w-xs mt-4 py-3 bg-gray-200 text-gray-700 rounded-xl text-lg font-bold shadow-md flex items-center justify-center gap-2 ${isReviewingImmediate ? 'opacity-50' : ''}`}><LogOut size={20} />退出遊戲</button>
-          {isReviewingImmediate && latestAnswer && (
-            <div className="absolute inset-0 bg-blue-50/90 flex items-center justify-center p-8 z-40">
-              <div className="bg-white rounded-3xl p-6 shadow-2xl border-4 border-red-400 w-full max-w-sm text-center">
-                <h3 className="text-3xl font-black text-red-600 mb-4">答錯囉！</h3>
-                <p className="text-lg text-gray-700 mb-2">你輸入：<span className="text-red-500 font-extrabold">{formatTime(latestAnswer.h, latestAnswer.m)}</span></p>
-                <p className="text-xl font-extrabold text-green-600 mb-4">正確答案：{formatTime(currentQ.h, currentQ.m)}</p>
-                <div className="mb-6 flex justify-center"><ClockFace hours={currentQ.h} minutes={currentQ.m} size={150} /></div>
-                <button onClick={goToNextQuestion} className="w-full py-4 bg-gradient-to-r from-teal-400 to-green-400 text-white rounded-xl text-xl font-black">下一題！💪</button>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  if (gameState === 'results') {
-    const score = questions.filter((q, i) => isCorrect(q, userAnswers[i])).length;
-    const isPerfect = score === questions.length;
-    return (
-      <div className="min-h-screen bg-pink-50 flex flex-col items-center p-4 font-sans relative">
-        <HomeButton onClick={resetAndReturnToMenu} />
-        <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-screen border-4 border-white mt-16">
-          <div className={`p-8 text-center text-white ${isPerfect ? 'bg-gradient-to-br from-yellow-400 to-orange-400' : 'bg-gradient-to-br from-indigo-500 to-purple-500'}`}>
-            <div className="flex justify-center mb-2">{isPerfect ? <Star size={48} className="fill-white" /> : <ClockIcon size={48} />}</div>
-            <h2 className="text-3xl font-black mb-2">{isPerfect ? '你真是時間大師！' : '很棒的練習！'}</h2>
-            <p className="text-xl font-bold">得分：{score} / {questions.length} 分</p>
-          </div>
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
-            {selectedReviewQ !== null ? (
-              <div className="bg-white rounded-3xl border-4 border-yellow-200 p-4 relative shadow-xl">
-                <button onClick={() => setSelectedReviewQ(null)} className="absolute top-3 right-3 p-2 bg-gray-100 rounded-full"><X size={20} /></button>
-                <div className="bg-yellow-100 text-yellow-700 px-4 py-1 rounded-full text-sm font-bold mb-4 inline-block">第 {selectedReviewQ + 1} 題</div>
-                <div className="mb-4 flex justify-center"><ClockFace hours={questions[selectedReviewQ].h} minutes={questions[selectedReviewQ].m} size={200} /></div>
-                <div className="flex gap-4">
-                  <div className="flex-1 bg-red-50 p-3 rounded-2xl text-center">
-                    <div className="text-xs text-red-400 font-bold mb-1">你的答案</div>
-                    <div className={`text-2xl font-black ${isCorrect(questions[selectedReviewQ], userAnswers[selectedReviewQ]) ? 'text-green-500' : 'text-red-500'}`}>{formatTime(userAnswers[selectedReviewQ].h, userAnswers[selectedReviewQ].m)}</div>
-                  </div>
-                  <div className="flex-1 bg-green-50 p-3 rounded-2xl text-center">
-                    <div className="text-xs text-green-600 font-bold mb-1">正確答案</div>
-                    <div className="text-2xl font-black text-green-600">{formatTime(questions[selectedReviewQ].h, questions[selectedReviewQ].m)}</div>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="text-center py-4 bg-white border-2 border-dashed border-indigo-200 rounded-2xl text-indigo-400 font-bold text-sm">👇 點擊卡片複習</div>
-            )}
-            <div className="space-y-3">
-              {questions.map((q, idx) => {
-                const correct = isCorrect(q, userAnswers[idx]);
-                return (
-                  <button key={idx} onClick={() => setSelectedReviewQ(idx)} className="w-full flex items-center justify-between p-4 rounded-2xl bg-white shadow-sm">
-                    <div className="flex items-center gap-4">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${correct ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-500'}`}>{correct ? <Check size={24} strokeWidth={3} /> : <X size={24} strokeWidth={3} />}</div>
-                      <span className="font-bold text-gray-700">第 {idx + 1} 題</span>
+        function renderMenu() {
+            return `
+                <div class="min-h-screen flex items-center justify-center p-4">
+                    <div class="bg-white rounded-[3rem] shadow-2xl p-8 max-w-md w-full text-center border-8 border-white ring-4 ring-yellow-200">
+                        <div class="mb-6 flex justify-center text-pink-500">
+                            <svg width="80" height="80" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="40" cy="40" r="35"/><polyline points="40 15 40 40 55 47"/>
+                            </svg>
+                        </div>
+                        <h1 class="text-4xl font-black text-indigo-500 mb-6">快樂學時鐘</h1>
+                        
+                        <div class="space-y-6 text-left">
+                            <div>
+                                <h3 class="text-xl font-bold text-gray-700 mb-3">▶ 選擇題目數量</h3>
+                                <div class="flex gap-4 justify-center">
+                                    ${[20, 30].map(c => `<button onclick="state.count=${c};render()" class="py-3 px-6 rounded-xl text-lg font-black shadow-md ${state.count === c ? 'bg-pink-500 text-white' : 'bg-white text-pink-500 border-2 border-pink-200'}">${c} 題</button>`).join('')}
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <h3 class="text-xl font-bold text-gray-700 mb-3">▶ 選擇測驗類型</h3>
+                                <div class="grid grid-cols-2 gap-3">
+                                    ${[{k:'hourly',l:'整點 (如 3:00)'},{k:'half',l:'半點 (如 3:30)'},{k:'five_min',l:'五分鐘 (如 3:05)'},{k:'random',l:'隨機分鐘'}].map(o => 
+                                        `<button onclick="state.interval='${o.k}';render()" class="py-2 px-4 rounded-xl text-sm font-medium ${state.interval === o.k ? 'bg-teal-500 text-white' : 'bg-white text-teal-600 border-2 border-teal-200'}">${o.l}</button>`
+                                    ).join('')}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <button onclick="startGame()" class="w-full mt-8 py-5 bg-gradient-to-r from-yellow-400 to-orange-400 text-white rounded-2xl text-2xl font-black shadow-[0_6px_0_0_#D97706] active:translate-y-2 transition-all">
+                            ▶ 開始挑戰 (${state.count} 題)
+                        </button>
                     </div>
-                    <ChevronRight size={20} className="text-gray-300" />
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-          <div className="p-4 bg-white border-t">
-            <button onClick={resetAndReturnToMenu} className="w-full py-4 bg-gray-800 text-white rounded-2xl font-black flex items-center justify-center gap-3"><RotateCcw size={24} />返回選單</button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-  return null;
-}
+                </div>`;
+        }
 
-ReactDOM.createRoot(document.getElementById('root')).render(<ClockLearningApp />);
+        function renderPlaying() {
+            const q = state.questions[state.currentIdx];
+            const lastAns = state.userAnswers[state.userAnswers.length - 1];
+            const disabled = state.processing || state.reviewing;
+            
+            return `
+                <div class="min-h-screen bg-blue-50 flex flex-col items-center p-4">
+                    <button onclick="returnToMenu()" class="fixed top-4 left-4 p-3 bg-white text-indigo-500 rounded-full shadow-lg z-50">
+                        <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+                        </svg>
+                    </button>
+                    
+                    <div class="w-full max-w-md pt-16 space-y-6">
+                        <div class="flex justify-between items-center px-2">
+                            <span class="text-indigo-400 font-black bg-white px-4 py-2 rounded-full shadow-lg">第 ${state.currentIdx + 1} / ${state.questions.length} 題</span>
+                            <div class="flex gap-1">
+                                ${state.questions.map((_, i) => `<div class="w-3 h-3 rounded-full ${i === state.currentIdx ? 'bg-pink-400 animate-pulse' : i < state.currentIdx ? 'bg-teal-400' : 'bg-gray-200'}"></div>`).join('')}
+                            </div>
+                        </div>
+                        
+                        <div class="bg-white p-6 rounded-[3rem] shadow-xl border-4 border-indigo-50">
+                            ${drawClock(q.h, q.m)}
+                        </div>
+                        
+                        <div class="text-center">
+                            <h2 class="text-2xl font-black text-indigo-600 mb-1">現在幾點呢？</h2>
+                            <p class="text-gray-400 font-medium">觀察時鐘，輸入正確的數字</p>
+                        </div>
+                        
+                        ${!state.reviewing ? `
+                            <div class="flex flex-col gap-4 w-full max-w-xs mx-auto">
+                                <div class="flex justify-center gap-3 mb-2">
+                                    <div onclick="${disabled ? '' : "state.focus='H';render()"}" class="relative p-4 rounded-2xl border-4 text-3xl font-black w-24 text-center cursor-pointer ${state.focus === 'H' ? 'border-pink-400 bg-pink-50 text-pink-600 shadow-lg' : 'border-gray-100 bg-white text-gray-400'} ${disabled ? 'opacity-50' : ''}">
+                                        ${state.input.h || '?'}
+                                        ${state.focus === 'H' && !disabled ? '<div class="absolute -top-2 -right-2 text-yellow-400">⭐</div>' : ''}
+                                    </div>
+                                    <span class="text-3xl font-black text-indigo-300">:</span>
+                                    <div onclick="${disabled ? '' : "state.focus='M';render()"}" class="relative p-4 rounded-2xl border-4 text-3xl font-black w-24 text-center cursor-pointer ${state.focus === 'M' ? 'border-cyan-400 bg-cyan-50 text-cyan-600 shadow-lg' : 'border-gray-100 bg-white text-gray-400'} ${disabled ? 'opacity-50' : ''}">
+                                        ${state.input.m || '?'}
+                                        ${state.focus === 'M' && !disabled ? '<div class="absolute -top-2 -right-2 text-yellow-400">⭐</div>' : ''}
+                                    </div>
+                                </div>
+                                
+                                <div class="grid grid-cols-3 gap-3">
+                                    ${[1,2,3,4,5,6,7,8,9].map(n => `<button onclick="handleInput(${n})" ${disabled ? 'disabled' : ''} class="p-4 bg-white rounded-2xl border-2 border-indigo-50 text-2xl font-black text-indigo-500 hover:bg-indigo-50 active:translate-y-1 ${disabled ? 'opacity-50' : ''}">${n}</button>`).join('')}
+                                    <button onclick="handleDelete()" ${disabled ? 'disabled' : ''} class="p-4 bg-red-50 rounded-2xl border-2 border-red-100 text-xl font-bold text-red-400 hover:bg-red-100 active:translate-y-1 ${disabled ? 'opacity-50' : ''}">⌫</button>
+                                    <button onclick="handleInput(0)" ${disabled ? 'disabled' : ''} class="p-4 bg-white rounded-2xl border-2 border-indigo-50 text-2xl font-black text-indigo-500 hover:bg-indigo-50 active:translate-y-1 ${disabled ? 'opacity-50' : ''}">0</button>
+                                    <button onclick="handleConfirm()" ${disabled ? 'disabled' : ''} class="p-4 bg-gradient-to-r from-pink-400 to-rose-400 rounded-2xl text-white text-xl font-black hover:from-pink-500 hover:to-rose-500 active:translate-y-1 ${disabled ? 'opacity-50' : ''}">OK ✓</button>
+                                </div>
+                            </div>
+                        ` : ''}
+                        
+                        ${state.reviewing && lastAns ? `
+                            <div class="fixed inset-0 bg-blue-50/90 backdrop-blur-sm flex items-center justify-center p-8 z-40">
+                                <div class="bg-white rounded-3xl p-6 shadow-2xl border-4 border-red-400 max-w-sm text-center">
+                                    <h3 class="text-3xl font-black text-red-600 mb-4">答錯囉！</h3>
+                                    <p class="text-lg text-gray-700 mb-2">你輸入：<span class="text-red-500 font-extrabold">${formatTime(lastAns.h, lastAns.m)}</span></p>
+                                    <p class="text-xl font-extrabold text-green-600 mb-4">正確答案：${formatTime(q.h, q.m)}</p>
+                                    <div class="mb-6">${drawClock(q.h, q.m, 150)}</div>
+                                    <button onclick="goNext()" class="w-full py-4 bg-gradient-to-r from-teal-400 to-green-400 text-white rounded-xl text-xl font-black shadow-[0_4px_0_0_#065F46] active:translate-y-1">下一題！💪</button>
+                                </div>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>`;
+        }
+
+        function renderResults() {
+            const score = state.questions.filter((q, i) => state.userAnswers[i] && isCorrect(q, state.userAnswers[i])).length;
+            const perfect = score === state.questions.length;
+            
+            return `
+                <div class="min-h-screen bg-pink-50 flex flex-col items-center p-4">
+                    <button onclick="returnToMenu()" class="fixed top-4 left-4 p-3 bg-white text-indigo-500 rounded-full shadow-lg z-50">
+                        <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+                        </svg>
+                    </button>
+                    
+                    <div class="w-full max-w-lg bg-white rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] border-4 border-white ring-4 ring-pink-100 mt-16">
+                        <div class="p-8 text-center text-white ${perfect ? 'bg-gradient-to-br from-yellow-400 to-orange-400' : 'bg-gradient-to-br from-indigo-500 to-purple-500'}">
+                            <div class="text-5xl mb-2">${perfect ? '⭐' : '🕐'}</div>
+                            <h2 class="text-3xl font-black mb-2">${perfect ? '你真是個時間大師！' : '很棒的練習！'}</h2>
+                            <p class="text-xl font-bold">得分： ${score} / ${state.questions.length} 分</p>
+                        </div>
+                        
+                        <div class="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50/50">
+                            ${state.selectedReview !== null ? `
+                                <div class="bg-white rounded-3xl border-4 border-yellow-200 p-4 relative shadow-xl">
+                                    <button onclick="state.selectedReview=null;render()" class="absolute top-3 right-3 p-2 bg-gray-100 rounded-full text-gray-400 hover:bg-gray-200">✕</button>
+                                    <div class="bg-yellow-100 text-yellow-700 px-4 py-1 rounded-full text-sm font-bold mb-4 inline-block">第 ${state.selectedReview + 1} 題：題目回顧</div>
+                                    <div class="mb-4 flex justify-center">${drawClock(state.questions[state.selectedReview].h, state.questions[state.selectedReview].m, 200)}</div>
+                                    <div class="flex gap-4">
+                                        <div class="flex-1 bg-red-50 p-3 rounded-2xl border-2 border-red-100 text-center">
+                                            <div class="text-xs text-red-400 font-bold mb-1">你的答案</div>
+                                            <div class="text-2xl font-black ${state.userAnswers[state.selectedReview] && isCorrect(state.questions[state.selectedReview], state.userAnswers[state.selectedReview]) ? 'text-green-500' : 'text-red-500'}">
+                                                ${state.userAnswers[state.selectedReview] ? formatTime(state.userAnswers[state.selectedReview].h, state.userAnswers[state.selectedReview].m) : '--:--'}
+                                            </div>
+                                        </div>
+                                        <div class="flex-1 bg-green-50 p-3 rounded-2xl border-2 border-green-100 text-center">
+                                            <div class="text-xs text-green-600 font-bold mb-1">正確答案</div>
+                                            <div class="text-2xl font-black text-green-600">${formatTime(state.questions[state.selectedReview].h, state.questions[state.selectedReview].m)}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ` : `
+                                <div class="text-center py-4 bg-white/50 border-2 border-dashed border-indigo-200 rounded-2xl text-indigo-400 font-bold text-sm">
+                                    👇 點擊下方列表複習題目
+                                </div>
+                            `}
+                            
+                            <div class="space-y-3">
+                                ${state.questions.map((q, i) => {
+                                    const ans = state.userAnswers[i];
+                                    const correct = ans && isCorrect(q, ans);
+                                    const selected = state.selectedReview === i;
+                                    return `
+                                        <button onclick="state.selectedReview=${i};render()" class="w-full flex items-center justify-between p-4 rounded-2xl border-b-4 ${selected ? 'bg-yellow-50 border-yellow-300 ring-2 ring-yellow-200' : 'bg-white border-gray-200 shadow-sm'}">
+                                            <div class="flex items-center gap-4">
+                                                <div class="w-10 h-10 rounded-full flex items-center justify-center shadow-md ${correct ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-500'}">
+                                                    ${correct ? '✓' : '✕'}
+                                                </div>
+                                                <span class="font-bold text-gray-700 text-lg">第 ${i + 1} 題</span>
+                                            </div>
+                                            ${!selected ? '<span class="text-sm font-bold text-indigo-300 bg-indigo-50 px-2 py-1 rounded-lg">查看詳情</span>' : ''}
+                                        </button>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
+                        
+                        <div class="p-4 bg-white border-t">
+                            <button onclick="returnToMenu()" class="w-full py-4 bg-gray-800 hover:bg-gray-900 text-white rounded-2xl font-black shadow-lg active:scale-95">↻ 返回選單/再玩一次</button>
+                        </div>
+                    </div>
+                </div>`;
+        }
+
+        function render() {
+            let html = '';
+            if(state.screen === 'menu') html = renderMenu();
+            else if(state.screen === 'playing') html = renderPlaying();
+            else if(state.screen === 'results') html = renderResults();
+            document.getElementById('app').innerHTML = html;
+        }
+
+        render();
     </script>
 </body>
 </html>
